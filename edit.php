@@ -1,15 +1,15 @@
 <?php
-	require "connect.php";         //Dane bazy danych
-	$con=connection();	
-	$sql="SELECT title,
-	 (SELECT count(parent.id)-1
-	  FROM elements AS parent
-	  WHERE node.lft BETWEEN parent.lft AND parent.rgt)
-	 AS depth
-	FROM elements AS node
-	ORDER BY node.lft";
+	require "pdo.php";
 	
-	$result = mysqli_query($con,$sql);
+	$res = $pdo->query("SELECT title,
+	(SELECT count(parent.id)-1
+	FROM elements AS parent
+	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
+	AS depth
+	FROM elements AS node
+	ORDER BY node.lft");
+
+	$nodes = $res->fetchAll();
 
 ?>
 
@@ -38,8 +38,8 @@
 			<form action="index.php" method="POST">
 				<label> Zmień nazwę </label> </br>
 				<label> Węzeł/liść: </label> <select name="select">
-				<?php while($n = mysqli_fetch_object($result)){
-							echo "<option>".$n->title."</option>";
+				<?php foreach($nodes as $node){
+							echo "<option>".$node['title']."</option>";
 					  } ?>
 				</select> </br>
 				<label> Nowa nazwa: </label> <input type="text" name="name" required />

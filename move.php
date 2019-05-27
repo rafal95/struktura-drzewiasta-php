@@ -1,19 +1,15 @@
 <?php
-	require "connect.php";         //Dane bazy danych
-	$con=connection();	
-	$sql="SELECT title,
-	 (SELECT count(parent.id)-1
-	  FROM elements AS parent
-	  WHERE node.lft BETWEEN parent.lft AND parent.rgt)
-	 AS depth
-	FROM elements AS node
-	ORDER BY node.lft";
+	require "pdo.php";
 	
-	$result = mysqli_query($con,$sql);
-	while($n = mysqli_fetch_object($result)){
-		$tab[] = $n;
-	}
+	$res = $pdo->query("SELECT title,
+	(SELECT count(parent.id)-1
+	FROM elements AS parent
+	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
+	AS depth
+	FROM elements AS node
+	ORDER BY node.lft");
 
+	$nodes = $res->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -40,14 +36,14 @@
 		<div id="content">
 			<form action="index.php" method="POST">
 				<label> Przenieś: </label> <select name="source">
-				<?php foreach($tab as $name){
-							if($name->title != "root")
-								echo "<option>".$name->title."</option>";
+				<?php foreach($nodes as $node){
+							if($node['title'] != "root")
+								echo "<option>".$node['title']."</option>";
 					  } ?>
 				</select>
 				<label> do: </label>  <select name="destination">
-				<?php foreach($tab as $name){
-							echo "<option>".$name->title."</option>";
+				<?php foreach($nodes as $node){
+							echo "<option>".$node['title']."</option>";
 					  } ?>
 				</select>
 				<input type="submit" value="Przenieś" name="przenies" />

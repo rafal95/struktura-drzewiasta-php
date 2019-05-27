@@ -1,34 +1,32 @@
 <?php 
-	require "connect.php";         //Dane bazy danych
+	require "pdo.php";
 	require "function.php";  
-	$con=connection();	
 
-	
-	
 	
 	if(!empty($_POST)){
 		if(!empty($_POST['dodaj'])){
-			add($con,$_POST['select'],$_POST['name']);
+			add($_POST['select'],$_POST['name']);
 		}
 		else if(!empty($_POST['usun'])){
-			del($con,$_POST['select']);
+			del($_POST['select']);
 		}
 		else if(!empty($_POST['przenies'])){
-			move($con,$_POST['source'],$_POST['destination']);
+			move($_POST['source'],$_POST['destination']);
 		}
 		else if(!empty($_POST['edit'])){
-			edit($con,$_POST['select'],$_POST['name']);
+			edit($_POST['select'],$_POST['name']);
 		}
 	}
 	
-	$sql="SELECT title,
+	$res = $pdo->query("SELECT title,
 	(SELECT count(parent.id)-1
 	FROM elements AS parent
 	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
 	AS depth
 	FROM elements AS node
-	ORDER BY node.lft";
-	$result = mysqli_query($con,$sql);
+	ORDER BY node.lft");
+
+	$nodes = $res->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -55,28 +53,31 @@
 	<div id="content">
 		<form  action="index.php" method="POST">
 		<label> Wybierz węzeł: </label> <select name="select" >
-			<?php while($n = mysqli_fetch_object($result)){
-				echo "<option>".$n->title."</option>";
+			<?php foreach($nodes as $node){
+				echo "<option>".$node['title']."</option>";
 			} ?>
 			</select>
 			<input type="submit" value="Pokaż" name="pokaz" />
 		</form>
 		<?php
+		
 			if(!empty($_POST)){
 				if(!empty($_POST['pokaz']))
 				{
-					showNode($con,$_POST['select']);
+					showNode($_POST['select']);
 				}
 				else{
-					showTree($con);
+					showTree();
 				}
 			}
 			else{
-				showTree($con);
+				showTree();
 			}
 		?>
+
 	</div>
 	</div>
+
 </body>
 </html>
 

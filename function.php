@@ -1,19 +1,21 @@
 <?php
-function showTree($con,$depth=0){
 
-	$sql="SELECT title,
-	 (SELECT count(parent.id)-1
-	  FROM elements AS parent
-	  WHERE node.lft BETWEEN parent.lft AND parent.rgt)
-	 AS depth
+function showTree($depth=0){
+	require "pdo.php";
+
+	$res = $pdo->query('SELECT title,
+	(SELECT count(parent.id)-1
+	FROM elements AS parent
+	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
+	AS depth
 	FROM elements AS node
-	ORDER BY node.lft";
-	
-	$result = mysqli_query($con,$sql);
+	ORDER BY node.lft');
+
+	$nodes = $res->fetchAll();
 	
 	$tree = array();
-	while ($row = mysqli_fetch_assoc($result)) {
-		$tree[] = $row;
+	foreach($nodes as $node) {
+		$tree[] = $node;
 	}
 	
 	$result = '';
@@ -40,28 +42,28 @@ function showTree($con,$depth=0){
 print $result;
 }
 
-//showTree($con);
+//showTree(;
 
-function showNode($con,$nodeName,$depth=0){
+function showNode($nodeName,$depth=0){
+	require "pdo.php";
+	$res = $pdo->prepare("SELECT lft, rgt FROM elements WHERE title=:name");
+	$res -> bindParam(':name',$nodeName);
+	$res -> execute();
+	$node = $res->fetch();
 
-	$sql = "SELECT lft, rgt FROM elements WHERE title='".$nodeName."'";
-	$node = mysqli_query($con,$sql);
-
-	$n = mysqli_fetch_object($node);
-	
-	$sql="SELECT title,
-	 (SELECT count(parent.id)-1
-	  FROM elements AS parent
-	  WHERE node.lft BETWEEN parent.lft AND parent.rgt)
-	 AS depth
+	$res = $pdo->query("SELECT title,
+	(SELECT count(parent.id)-1
+	FROM elements AS parent
+	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
+	AS depth
 	FROM elements AS node
-	WHERE node.lft BETWEEN ".$n->lft." AND ".$n->rgt." ORDER BY node.lft";
-	
-	$result = mysqli_query($con,$sql);
+	WHERE node.lft BETWEEN ".$node['lft']." AND ".$node['rgt']." ORDER BY node.lft");
+
+	$nodes = $res->fetchAll();
 	
 	$tree = array();
-	while ($row = mysqli_fetch_assoc($result)) {
-		$tree[] = $row;
+	foreach($nodes as $node) {
+		$tree[] = $node;
 	}
 	
 	$result = '';
@@ -86,148 +88,155 @@ function showNode($con,$nodeName,$depth=0){
 print $result;
 }
 
-//showNode($con,'Linux');
+//showNode('Linux');
 
-function add($con,$nodeName,$newElement){
+function add($nodeName,$newElement){
+	require "pdo.php";
 
-	$sql = "SELECT rgt FROM elements WHERE title='".$nodeName."'";
-	$node = mysqli_query($con,$sql);
+	$res = $pdo->query("SELECT title FROM elements");
+	$nodes = $res->fetchAll();
 
-	$n = mysqli_fetch_object($node);
-	$par1 = $n->rgt+1;
-	
-	$sql="UPDATE `elements` SET `lft` = `lft` + 2 WHERE `lft` >= ".$par1;
-	mysqli_query($con,$sql);
-	
-	$sql="UPDATE `elements` SET `rgt` = `rgt` + 2 WHERE `rgt` >= ".$par1;
-	mysqli_query($con,$sql);
-	
-	$sql ="INSERT INTO `elements` (`title`,`lft`,`rgt`) VALUES ('".$newElement."',".$n->rgt.",".$par1.")";
-	mysqli_query($con,$sql);
+	$exist = 0;
+	foreach($nodes as $node){
+		if(strtoupper($node['title']) == strtoupper($newElement)){
+			$exist = 1;
+			break;
+		}
+
+	}
+
+	if(!$exist){
+		$res = $pdo->prepare("SELECT rgt FROM elements WHERE title=:name");
+		$res -> bindParam(':name',$nodeName);
+		$res -> execute();
+		$node = $res->fetch();
+		$par1 = $node['rgt']+1;
+
+		$res = $pdo->prepare("UPDATE elements SET lft = `lft`+2  WHERE lft >=:par");
+		$res -> bindParam(':par',$par1);
+		$res -> execute();
+
+		$res = $pdo->prepare("UPDATE elements SET rgt = `rgt`+2  WHERE rgt >=:par");
+		$res -> bindParam(':par',$node['rgt']);
+		$res -> execute();
+
+		$res = $pdo->prepare("INSERT INTO elements (title,lft,rgt) VALUES (:new,:lft,:rgt)");
+		$res -> bindParam(':new',$newElement);
+		$res -> bindParam(':lft',$node['rgt']);
+		$res -> bindParam(':rgt',$par1);
+		$res -> execute();
+	}
+	else{
+		echo "<font color='red'>Taki węzeł już istnieje</font>";
+	}
 }
 
 //add($con,'Office','Access');
 
-function del($con,$element){
+function del($element){
+	require "pdo.php";
+	$res = $pdo->prepare("SELECT lft, rgt FROM elements WHERE title=:title");
+	$res -> bindParam(':title',$element);
+	$res -> execute();
 
-	$sql = "SELECT lft, rgt FROM elements WHERE title='".$element."'";
-	$node = mysqli_query($con,$sql);
+	$node = $res->fetch();
+	$par1 = $node['rgt'] + 1;
 
-	$n = mysqli_fetch_object($node);
-	$par1 = $n->rgt+1;
-	
-	$sql ="DELETE FROM `elements` WHERE lft BETWEEN ".$n->lft." AND ".$n->rgt;
-	mysqli_query($con,$sql);
-	
-	$sql="UPDATE `elements` SET `lft` = `lft` - 2 WHERE `lft` > ".$n->rgt;
-	mysqli_query($con,$sql);
-	
-	$sql="UPDATE `elements` SET `rgt` = `rgt` - 2 WHERE `rgt` > ".$n->rgt;
-	mysqli_query($con,$sql);
-	
+	$res = $pdo->query("DELETE FROM `elements` WHERE lft BETWEEN ".$node['lft']." AND ".$node['rgt']);
+	$res = $pdo->query("UPDATE `elements` SET `lft` = `lft` - 2 WHERE `lft` > ".$node['rgt']);
+	$res = $pdo->query("UPDATE `elements` SET `rgt` = `rgt` - 2 WHERE `rgt` > ".$node['rgt']);
+
 }
 
 //del($con,'InternetExplorer');
 
-function move($con,$element,$destination){
-	
-	$sql="SELECT title,
+function move($element,$destination){
+
+	require "pdo.php";
+	$res = $pdo->prepare("SELECT title,
 	(SELECT count(parent.id)-1
 	FROM elements AS parent
 	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
 	AS depth
-	FROM elements AS node WHERE title='".$element."'";
-	$result = mysqli_query($con,$sql);
-	$row = mysqli_fetch_object($result);
-	$source = $row->depth;
-	
-	$sql="SELECT title,
+	FROM elements AS node WHERE title=:title");
+	$res -> bindParam(':title',$element);
+	$res -> execute();
+	$node = $res->fetch();
+	$source = $node['depth'];
+
+	$res = $pdo->prepare("SELECT title,
 	(SELECT count(parent.id)-1
 	FROM elements AS parent
 	WHERE node.lft BETWEEN parent.lft AND parent.rgt)
 	AS depth
-	FROM elements AS node WHERE title='".$destination."'";
-	$result = mysqli_query($con,$sql);
-	$row = mysqli_fetch_object($result);
-	$dst = $row->depth;
+	FROM elements AS node WHERE title=:title");
+	$res -> bindParam(':title',$destination);
+	$res -> execute();
+	$node = $res->fetch();
+	$dst = $node['depth'];
 	
 	if($element == $destination){
 		echo "<font color='red'>Nie można przenieś. Żródło oraz miejsce docelowe muszą być inne</font>";
 	}
 	else{
-		$sql = "SELECT lft, rgt FROM elements WHERE title='".$element."'";
-		$node = mysqli_query($con,$sql);
-		$move = mysqli_fetch_object($node);
-		$movep = $move->rgt+1;
-			
-		$sql = "SELECT lft, rgt FROM elements WHERE title='".$destination."'";
-		$node = mysqli_query($con,$sql);
-		$dest = mysqli_fetch_object($node);
-		$destp = $dest->rgt-1;
-		
-			if($dst + 1 == $source and $dest->lft < $move->lft){
-				echo "<font color='red'>Przenoszony element już znajduje się w tym węźle</font>";
-			}
-			else{			
-				if($dest->rgt > $move->rgt){
-					$sql = "insert tmp
-					select * from elements
-					where lft >= ".$move->lft." and lft <= ".$move->rgt.";";
-					mysqli_query($con,$sql);
+		$res = $pdo->prepare("SELECT lft, rgt FROM elements WHERE title=:title");
+		$res -> bindParam(':title',$element);
+		$res -> execute();
+		$move = $res->fetch();
+		$movep = $move['rgt']+1;
+
+		$res = $pdo->prepare("SELECT lft, rgt FROM elements WHERE title=:title");
+		$res -> bindParam(':title',$destination);
+		$res -> execute();
+		$dest = $res->fetch();
+		$destp = $dest['rgt']-1;
+					
+				if($dest['rgt'] > $move['rgt']){
+
+					$res = $pdo->query("insert tmp select * from elements where lft >= ".$move['lft']." and lft <= ".$move['rgt'].";");
+
 					// l -3 , p - 4
 					// ld - 18, pd - 19
-					$pos = ($dest->rgt - $move->rgt) - 1;
-					$pos2 = ($move->rgt - $move->lft) + 1;
-					$sql = "UPDATE `tmp` SET `lft` = `lft` + ".$pos.";";
-					mysqli_query($con,$sql);
-					$sql = "UPDATE `tmp` SET `rgt` = `rgt` + ".$pos.";";
-					mysqli_query($con,$sql);
-					$sql = "DELETE FROM elements WHERE lft BETWEEN ".$move->lft." AND ".$move->rgt.";";
-					mysqli_query($con,$sql);
-					$sql = "UPDATE `elements` SET `lft` = `lft` - ".$pos2." WHERE `lft` BETWEEN ".$movep." AND ".$destp.";";
-					mysqli_query($con,$sql);
-					$sql = "UPDATE `elements` SET `rgt` = `rgt` - ".$pos2." WHERE `rgt` BETWEEN ".$movep." AND ".$destp.";";
-					mysqli_query($con,$sql);
-					$sql = "INSERT elements
-							select * from tmp;";
-					mysqli_query($con,$sql);
-					$sql = "DELETE FROM tmp;";
-					mysqli_query($con,$sql);
+					$pos = ($dest['rgt'] - $move['rgt']) - 1;
+					$pos2 = ($move['rgt'] - $move['lft']) + 1;
+					$res = $pdo->query("UPDATE `tmp` SET `lft` = `lft` + ".$pos.";");
+					$res = $pdo->query("UPDATE `tmp` SET `rgt` = `rgt` + ".$pos.";");
+					$res = $pdo->query("DELETE FROM elements WHERE lft BETWEEN ".$move['lft']." AND ".$move['rgt'].";");
+					$res = $pdo->query("UPDATE `elements` SET `lft` = `lft` - ".$pos2." WHERE `lft` BETWEEN ".$movep." AND ".$destp.";");
+					$res = $pdo->query("UPDATE `elements` SET `rgt` = `rgt` - ".$pos2." WHERE `rgt` BETWEEN ".$movep." AND ".$destp.";");
+					$res = $pdo->query("INSERT elements select * from tmp;");
+					$res = $pdo->query("DELETE FROM tmp;");
 					
 				}else{
 					
-					$sql ="insert tmp
-					select * from elements
-					where lft >= ".$move->lft." and lft <= ".$move->rgt.";";
-					mysqli_query($con,$sql);
-					$pos = $move->lft - $dest->rgt;
-					$sql = "UPDATE `tmp` SET `lft` = `lft` - ".$pos.";";
-					mysqli_query($con,$sql);
-					$sql = "UPDATE `tmp` SET `rgt` = `rgt` - ".$pos.";";
-					mysqli_query($con,$sql);
-					$sql = "DELETE FROM elements WHERE lft BETWEEN ".$move->lft." AND ".$move->rgt.";";
-					mysqli_query($con,$sql);
-					$pos2 = ($move->rgt - $move->lft) +1;
-					$movel = $move->lft-1;
-					$sql = "UPDATE `elements` SET `lft` = `lft` + ".$pos2." WHERE `lft` BETWEEN ".$dest->rgt." AND ".$movel.";";
-					mysqli_query($con,$sql);
-					$sql = "UPDATE `elements` SET `rgt` = `rgt` + ".$pos2." WHERE `rgt` BETWEEN ".$dest->rgt." AND ".$movel.";";
-					mysqli_query($con,$sql);
-							$sql = "INSERT elements
-							select * from tmp;";
-					mysqli_query($con,$sql);
-					$sql = "DELETE FROM tmp;";
-					mysqli_query($con,$sql);
+					$res = $pdo->query("insert tmp select * from elements where lft >= ".$move['lft']." and lft <= ".$move['rgt'].";");
+
+					$pos = $move['lft'] - $dest['rgt'];
+
+					$res = $pdo->query("UPDATE `tmp` SET `lft` = `lft` - ".$pos.";");
+					$res = $pdo->query("UPDATE `tmp` SET `rgt` = `rgt` - ".$pos.";");
+					$res = $pdo->query("DELETE FROM elements WHERE lft BETWEEN ".$move['lft']." AND ".$move['rgt'].";");
+
+					$pos2 = ($move['rgt'] - $move['lft']) +1;
+					$movel = $move['lft']-1;
+
+					$res = $pdo->query("UPDATE `elements` SET `lft` = `lft` + ".$pos2." WHERE `lft` BETWEEN ".$dest['rgt']." AND ".$movel.";");
+					$res = $pdo->query("UPDATE `elements` SET `rgt` = `rgt` + ".$pos2." WHERE `rgt` BETWEEN ".$dest['rgt']." AND ".$movel.";");
+					$res = $pdo->query("INSERT elements select * from tmp;");
+					$res = $pdo->query("DELETE FROM tmp;");
 				}
-			}
 	}
 }
 
 //move($con,'InternetExplorer','Excel');
 
-function edit($con, $element, $newName){
-	$sql="UPDATE `elements` SET `title` = '".$newName."' WHERE title='".$element."'";
-	mysqli_query($con,$sql);
+function edit($element, $newName){
+	require "pdo.php";
+	$res = $pdo->prepare("UPDATE elements SET title = :new_title  WHERE title=:old_title");
+	$res -> bindParam(':new_title',$newName);
+	$res -> bindParam(':old_title',$element);
+	$res -> execute();
+
 }
 	
 ?>
