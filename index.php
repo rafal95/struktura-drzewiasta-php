@@ -17,7 +17,7 @@
 			edit($_POST['select'],$_POST['name']);
 		}
 	}
-	
+if(isset($pdo)){
 	$res = $pdo->query("SELECT title,
 	(SELECT count(parent.id)-1
 	FROM elements AS parent
@@ -27,6 +27,7 @@
 	ORDER BY node.lft");
 
 	$nodes = $res->fetchAll();
+	
 ?>
 
 <!DOCTYPE html>
@@ -81,5 +82,6 @@
 </body>
 </html>
 
-
-
+<?php
+}
+?>

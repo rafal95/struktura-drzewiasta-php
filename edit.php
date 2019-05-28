@@ -1,6 +1,6 @@
 <?php
 	require "pdo.php";
-	
+if(isset($pdo)){	
 	$res = $pdo->query("SELECT title,
 	(SELECT count(parent.id)-1
 	FROM elements AS parent
@@ -49,7 +49,8 @@
 	</div>
 </body>
 </html>
-
-
+<?php 
+}
+?>
 
 
